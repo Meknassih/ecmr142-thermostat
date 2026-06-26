@@ -1,0 +1,11 @@
+build/
+*.dis
+*.elf
+*.elf.map
+*.hex
+*.bin
+*.uf2
+.DS_Store
+*.swp
+*.swo
+*~
