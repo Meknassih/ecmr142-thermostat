@@ -3,11 +3,12 @@
 #include "pico/cyw43_arch.h"
 #include <stdbool.h>
 #include "hardware/i2c.h"
+#include "ssd1306.h"
 
 #define LED_PIN 5
 #define BTN_PIN 15
-#define OLED_SDA_PIN 10
-#define OLED_SCL_PIN 11
+#define OLED_SDA_PIN 8
+#define OLED_SCL_PIN 9
 
 void toggle_running_led(unsigned int gpio) {
     bool curr = cyw43_arch_gpio_get(gpio);
@@ -27,12 +28,17 @@ int main() {
     gpio_set_function(OLED_SCL_PIN, GPIO_FUNC_I2C);
     gpio_pull_up(OLED_SDA_PIN);
     gpio_pull_up(OLED_SCL_PIN);
-    i2c_init(i2c_default, 100 * 1000);
+    i2c_init(i2c_default, 400 * 1000);
 
     int err = cyw43_arch_init();
     if (err) {
         reset_usb_boot(0, 0);
     }
+
+    ssd1306_init(i2c_default);
+    ssd1306_clear();
+    ssd1306_write_string(16, 12, "Hello World!");
+    ssd1306_show();
 
     unsigned int tick=10;
 
