@@ -11,7 +11,7 @@
 typedef struct {
   const char *name;
   const uint8_t *frame;
-  const size_t frame_len;
+  size_t frame_len;
 } ecmr142_signal;
 
 extern const uint8_t cold_22c_fan1[FRAME_MAX_LEN];
@@ -30,5 +30,8 @@ extern const uint8_t fan1_off[FRAME_MAX_LEN];
 
 extern const ecmr142_signal signals[SIGNALS_COUNT];
 
+void frame_to_hex_str(const uint8_t *frame, const size_t frame_len, char* str, const size_t str_max_len);
 bool ident_frame(const uint8_t *frame, const size_t frame_len, char *frame_name, const size_t name_max_len);
+void clone_signal(ecmr142_signal *dest, const ecmr142_signal *src);
+bool get_signal_by_name(const char* signal_name, const size_t name_max_len, ecmr142_signal *signal);
 #endif

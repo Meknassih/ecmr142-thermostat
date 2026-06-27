@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>
+#include <string.h>
 
 const uint8_t
     cold_22c_fan1[FRAME_MAX_LEN] = {0x23, 0xCB, 0x26, 0x01, 0x00, 0x24, 0x03,
@@ -72,6 +73,46 @@ bool ident_frame(const uint8_t *frame, const size_t frame_len, char *frame_name,
     } else {
       // Copy name and return
       strncpy(frame_name, signals[i].name, name_max_len);
+      return true;
+    }
+  }
+
+  return false;
+}
+
+void frame_to_hex_str(const uint8_t *frame, const size_t frame_len, char* str, const size_t str_max_len) {
+  str[0] = '\0';
+  const unsigned short byte_str_len = 7;
+  for (int i = 0; i < frame_len; i++) {
+    char byte_str[byte_str_len]; // `0xAA, \0`
+    if (i == (frame_len - 1))
+      snprintf(byte_str, byte_str_len, "0x%02X", frame[i]);
+    else
+      snprintf(byte_str, byte_str_len, "0x%02X, ", frame[i]);
+
+    strcat(str, byte_str);
+  }
+}
+
+void clone_signal(ecmr142_signal *dest, const ecmr142_signal *src) {
+  dest->name = src->name;
+  // printf("\t\tcopied %s -> %s\n", src->name, dest->name);
+  dest->frame = src->frame;
+  dest->frame_len = src->frame_len;
+  const unsigned short frame_str_len = FRAME_MAX_LEN*7;
+  char src_frame_str[frame_str_len], dest_frame_str[frame_str_len];
+  frame_to_hex_str(src->frame, src->frame_len, src_frame_str, frame_str_len);
+  frame_to_hex_str(dest->frame, dest->frame_len, dest_frame_str, frame_str_len);
+  // printf("\tcopied\n\t\t%s ->\n\t\t%s\n", src_frame_str, dest_frame_str);
+}
+
+bool get_signal_by_name(const char* signal_name, const size_t name_max_len, ecmr142_signal *signal) {
+  for (int i=0; i<SIGNALS_COUNT; i++) {
+    const unsigned int res = strncmp(signals[i].name, signal_name, name_max_len);
+    // printf("INFO: `%s` == `%s`? %u\n", signals[i].name, signal_name, res);
+    if (res == 0) {
+      // printf("\tFound signal %s\n", signals[i].name);
+      clone_signal(signal, &(signals[i]));
       return true;
     }
   }
