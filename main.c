@@ -30,7 +30,7 @@ void toggle_running_led(unsigned int gpio) {
 
 int main() {
     stdio_init_all();
-    sleep_ms(1500);
+    sleep_ms(1500); // Allow USB serial to connect
     gpio_init(BTN_PIN);
     gpio_init(LED_PIN);
     gpio_set_dir(LED_PIN, 1);
