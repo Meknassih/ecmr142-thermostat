@@ -6,6 +6,8 @@
 #include <string.h>
 #include "hardware/i2c.h"
 #include "ssd1306.h"
+#include "aht20.h"
+#include "bmp280.h"
 #include "ir_receiver.h"
 #include "ir_emitter.h"
 #include <stdio.h>
@@ -28,6 +30,7 @@ void toggle_running_led(unsigned int gpio) {
 
 int main() {
     stdio_init_all();
+    sleep_ms(1500);
     gpio_init(BTN_PIN);
     gpio_init(LED_PIN);
     gpio_set_dir(LED_PIN, 1);
@@ -49,11 +52,21 @@ int main() {
     ssd1306_write_string(16, 12, "Started");
     ssd1306_show();
 
+    if (!aht20_init(i2c_default)) {
+        printf("WARN: AHT20 init failed\n");
+    }
+    if (!bmp280_init(i2c_default)) {
+        printf("WARN: BMP280 init failed\n");
+    }
+
     ir_receiver_init(IR_RCV_PIN);
     ir_emitter_init(IR_EMIT_PIN, 38);
 
     unsigned int tick=10;
     unsigned long int tick_count=0;
+
+    float aht_t = 0.0f, aht_h = 0.0f;
+    float bmp_t = 0.0f, bmp_p = 0.0f;
 
     toggle_running_led(CYW43_WL_GPIO_LED_PIN);
 
@@ -63,6 +76,20 @@ int main() {
     while (true) {
         ssd1306_clear();
         ssd1306_write_string(2, 0, "Running...");
+
+        if (tick_count % 100 == 0) {
+            if (aht20_read(&aht_t, &aht_h)) {
+                printf("AHT20: %.1fC  %.1f%%RH\n", aht_t, aht_h);
+            }
+            if (bmp280_read(&bmp_t, &bmp_p)) {
+                printf("BMP280: %.1fC  %.0fPa\n", bmp_t, bmp_p);
+            }
+        }
+
+        char line[17];
+        snprintf(line, sizeof(line), "T%dC H%d P%d",
+                 (int)aht_t, (int)aht_h, (int)(bmp_p / 100.0f));
+        ssd1306_write_string(2, 16, line);
 
         // IR raw capture
         /* uint32_t durations[400];
