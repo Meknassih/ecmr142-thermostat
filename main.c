@@ -6,7 +6,8 @@
 #include "hardware/i2c.h"
 #include "ssd1306.h"
 #include "ir_receiver.h"
-#include "stdio.h"
+#include <stdio.h>
+#include "ecmr142.h"
 
 #define LED_PIN 5
 #define BTN_PIN 15
@@ -59,23 +60,22 @@ int main() {
         ssd1306_write_string(2, 0, "Running...");
 
         // IR scan
-        /* bool ir_has_scanned = ir_receiver_scan_nec(IR_RCV_PIN, &addr,  &cmd, 1000);
-        sprintf(addr_str, "addr:%hu", addr);
-        sprintf(cmd_str, "cmd:%hu", cmd);
-            ssd1306_write_string(2, 8, addr_str);
-            ssd1306_write_string(2, 16, cmd_str);
-        if (ir_has_scanned == true) {
-            ssd1306_write_string(2, 24, "SCANNED!");
-        } */
-        uint8_t bytes[16];
+        uint8_t bytes[FRAME_MAX_LEN];
         int bits = ir_receiver_scan_frame(IR_RCV_PIN, bytes, 16, 1000);
         if (bits > 0) {
+            int byte_count = (bits + 7) / 8;
             printf("Decoded %d bits:\n", bits);
-            for (int i = 0; i < (bits + 7) / 8; i++) {
+            printf("\t");
+            for (int i = 0; i < byte_count; i++) {
                 if (i == ((bits + 7) / 8) - 1)
                     printf("0x%02X\n", bytes[i]);
                 else
                     printf("0x%02X, ", bytes[i]);
+            }
+
+            char signal_name32[32];
+            if (ident_frame(bytes, byte_count, signal_name32, 32)) {
+                printf("\tIdent: %s\n", signal_name32);
             }
         }
         
