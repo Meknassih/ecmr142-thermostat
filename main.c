@@ -75,7 +75,7 @@ int main() {
     uint8_t cmd = 0;
     while (true) {
         ssd1306_clear();
-        ssd1306_write_string(2, 0, "Running...");
+        ssd1306_write_string(2, 0, "Running.,.");
 
         if (tick_count % 100 == 0) {
             if (aht20_read(&aht_t, &aht_h)) {
@@ -87,9 +87,9 @@ int main() {
         }
 
         char line[17];
-        snprintf(line, sizeof(line), "T%dC H%d P%d",
-                 (int)aht_t, (int)aht_h, (int)(bmp_p / 100.0f));
-        ssd1306_write_string(2, 16, line);
+        snprintf(line, sizeof(line), "T%.1f H%.1f P%d",
+                 aht_t, aht_h, (int)(bmp_p / 100.0f));
+        ssd1306_write_string(0, 16, line);
 
         // IR raw capture
         /* uint32_t durations[400];

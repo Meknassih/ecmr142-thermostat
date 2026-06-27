@@ -55,6 +55,8 @@ static void send_buf(uint8_t *buf, int len) {
 static int get_font_index(uint8_t ch) {
     if (ch >= 'A' && ch <= 'Z') return (ch - 'A' + 1) * 8;
     if (ch >= '0' && ch <= '9') return (ch - '0' + 27) * 8;
+    if (ch == ',') return 37 * 8;
+    if (ch == '.') return 38 * 8;
     return 0;
 }
 
