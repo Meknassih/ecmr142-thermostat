@@ -7,8 +7,8 @@
 #define FAN_DUR_US            (2ull * 60 * 1000 * 1000)
 
 #define TARGET_TEMP           25.5f
-#define TARGET_HUM            52.0f
-#define DEADBAND_HIGH          2.0f
+#define TARGET_HUM            50.0f
+#define DEADBAND_HIGH          3.0f
 #define GENTLE_BAND            0.5f
 #define GENTLE_HYST            0.3f
 
