@@ -1,6 +1,6 @@
-# Pico Thermostat
+# ECMR142 thermostat
 
-Autonomous IR thermostat for Mitsubishi ECMR142 air conditioners, running on a Raspberry Pi Pico 2 W.
+Autonomous IR thermostat for (ECMR142)[https://www.boulanger.com/ref/8008803] air conditioners (based on Mistsubishi tech), running on a Raspberry Pi Pico 2 W.
 
 ## How It Works
 
@@ -14,10 +14,12 @@ Control strategies implement a simple `evaluate(temp, hum) → state` interface 
 | COOL_HIGH → COOL_LOW | Temperature within 0.5 °C of target |
 | COOL_LOW → COOL_HIGH | Temperature rises back above gentle band + hysteresis |
 | COOL_LOW → FAN | Target reached (temp ≤ 25.5 °C, humidity ≤ 50%) |
-| Any COOL → FAN | Cooling exceeds 30-minute safety limit |
+| Any COOL → FAN | Cooling exceeds 30-minute limit |
 | FAN → OFF | 2-minute fan dry-out completes |
 
 State changes are debounced (60-second minimum between transitions), the compressor is capped at 30 minutes continuous runtime, and a 2-minute fan-only phase dries the evaporator coil before shutdown.
+
+All limits and thresholds are configurable by editing `#define`s.
 
 ## Required Components
 
