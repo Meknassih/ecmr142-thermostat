@@ -1,7 +1,10 @@
 #include "ir_emitter.h"
+#include "ecmr142.h"
 #include "pico/stdlib.h"
 #include "hardware/pwm.h"
 #include "hardware/clocks.h"
+#include <stdio.h>
+#include <string.h>
 
 static unsigned int ir_emitter_slice;
 
@@ -148,4 +151,16 @@ void ir_emitter_send_mitsubishi(unsigned int pin, const uint8_t *bytes, int coun
             ir_emitter_space(pin, MITSUBISHI_FRAME_GAP);
         }
     }
+}
+
+void ir_emitter_send_signal(unsigned int pin, char *signal_name) {
+    ecmr142_signal sig = {0};
+    if(!get_signal_by_name(signal_name, strlen(signal_name)+1, &sig)) {
+        printf("WARN: Failed to get signal `%s`\n", signal_name);
+    }
+    ir_emitter_send_bytes(pin, sig.frame, sig.frame_len);
+    char frame_str[FRAME_MAX_LEN*7] = "\0";
+    frame_to_hex_str(sig.frame, sig.frame_len, frame_str, FRAME_MAX_LEN*7);
+    printf("\nINFO: Emitted signal '%s' (%u bytes)\n", sig.name, sig.frame_len);
+    printf("%s\n", frame_str);
 }

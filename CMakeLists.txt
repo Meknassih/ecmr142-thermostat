@@ -5,7 +5,7 @@ include(pico_sdk_import.cmake)
 project(main C CXX ASM)
 pico_sdk_init()
 
-add_executable(main main.c ssd1306.c ir_receiver.c ir_emitter.c ecmr142.c aht20.c bmp280.c)
+add_executable(main main.c ssd1306.c ir_receiver.c ir_emitter.c ecmr142.c aht20.c bmp280.c ac_state.c ac_strategy_economic.c)
 target_include_directories(main PRIVATE ${CMAKE_CURRENT_LIST_DIR})
 target_link_libraries(main pico_stdlib pico_cyw43_arch_none hardware_i2c hardware_pwm)
 pico_add_extra_outputs(main)

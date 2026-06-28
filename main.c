@@ -12,6 +12,8 @@
 #include "ir_emitter.h"
 #include <stdio.h>
 #include "ecmr142.h"
+#include "ac_state.h"
+#include "ac_strategy_economic.h"
 
 #define LED_PIN 5
 #define BTN_PIN 15
@@ -67,15 +69,21 @@ int main() {
 
     float aht_t = 0.0f, aht_h = 0.0f;
     float bmp_t = 0.0f, bmp_p = 0.0f;
+    float avg_t = 0.0f;
 
     toggle_running_led(CYW43_WL_GPIO_LED_PIN);
+
+    ac_state_init();
+    ac_state_set_strategy(&strategy_economic);
 
     char *addr_str = calloc(64, sizeof(char)), *cmd_str = calloc(64, sizeof(char));
     uint8_t addr = 0;
     uint8_t cmd = 0;
     while (true) {
+        char s_line[17];
+        ac_state_str(ac_state_get(), s_line, sizeof(s_line));
         ssd1306_clear();
-        ssd1306_write_string(2, 0, "Running.,.");
+        ssd1306_write_string(8, 0, s_line);
 
         if (tick_count % 100 == 0) {
             if (aht20_read(&aht_t, &aht_h)) {
@@ -84,12 +92,37 @@ int main() {
             if (bmp280_read(&bmp_t, &bmp_p)) {
                 printf("BMP280: %.1fC  %.0fPa\n", bmp_t, bmp_p);
             }
+            avg_t = (aht_t + bmp_t) / 2;
+
+            ac_state_evaluate(avg_t, aht_h);
+            if (ac_state_changed()) {
+                switch (ac_state_get()) {
+                case AC_COOL_LOW:
+                    ir_emitter_send_signal(IR_EMIT_PIN, "cold_22c_fan1");
+                    break;
+                case AC_COOL_MED:
+                    ir_emitter_send_signal(IR_EMIT_PIN, "cold_22c_fan2");
+                    break;
+                case AC_COOL_HIGH:
+                    ir_emitter_send_signal(IR_EMIT_PIN, "cold_22c_fan3");
+                    break;
+                case AC_OFF:
+                    ir_emitter_send_signal(IR_EMIT_PIN, "cold_off");
+                    break;
+                case AC_FAN:
+                    ir_emitter_send_signal(IR_EMIT_PIN, "fan1");
+                    break;
+                }
+            }
         }
 
-        char line[17];
-        snprintf(line, sizeof(line), "T%.1f H%.1f P%d",
-                 aht_t, aht_h, (int)(bmp_p / 100.0f));
-        ssd1306_write_string(0, 16, line);
+        // Write sensor values to OLED
+        char t_h_line[17], p_line[17];
+        snprintf(t_h_line, sizeof(t_h_line), "%.1fC %.1f%%",
+                 avg_t, aht_h);
+        ssd1306_write_string(0, 16, t_h_line);
+        snprintf(p_line, sizeof(p_line), "%.0fPa", bmp_p);
+        ssd1306_write_string(0, 24, p_line);
 
         // IR raw capture
         /* uint32_t durations[400];
@@ -111,39 +144,6 @@ int main() {
                 printf("\tIdent: %s\n", signal_name32);
             }
         } */
-
-        // IR Emit
-        if (tick_count%600 == 0) {
-            ecmr142_signal sig = {0};
-            if(!get_signal_by_name("cold_22c_fan1", strlen("cold_22c_fan1")+1, &sig)) {
-                printf("WARN: Failed to get signal `cold_22c_fan1`\n");
-            }
-            ir_emitter_send_bytes(IR_EMIT_PIN, sig.frame, sig.frame_len);
-            char frame_str[FRAME_MAX_LEN*7] = "\0";
-            frame_to_hex_str(sig.frame, sig.frame_len, frame_str, FRAME_MAX_LEN*7);
-            printf("\nINFO: Emitted signal '%s' (%lu bytes)\n", sig.name, sig.frame_len);
-            printf("%s\n", frame_str);
-        } else if (tick_count%600 == 200) {
-            ecmr142_signal sig = {0};
-            if(!get_signal_by_name("cold_22c_fan2", strlen("cold_22c_fan2")+1, &sig)) {
-                printf("WARN: Failed to get signal `cold_22c_fan2`\n");
-            }
-            ir_emitter_send_bytes(IR_EMIT_PIN, sig.frame, sig.frame_len);
-            char frame_str[FRAME_MAX_LEN*7] = "\0";
-            frame_to_hex_str(sig.frame, sig.frame_len, frame_str, FRAME_MAX_LEN*7);
-            printf("\nINFO: Emitted signal '%s' (%lu bytes)\n", sig.name, sig.frame_len);
-            printf("%s\n", frame_str);
-        } else if (tick_count%600 == 400) {
-            ecmr142_signal sig = {0};
-            if(!get_signal_by_name("cold_22c_fan3", strlen("cold_22c_fan3")+1, &sig)) {
-                printf("WARN: Failed to get signal `cold_22c_fan3`\n");
-            }
-            ir_emitter_send_bytes(IR_EMIT_PIN, sig.frame, sig.frame_len);
-            char frame_str[FRAME_MAX_LEN*7] = "\0";
-            frame_to_hex_str(sig.frame, sig.frame_len, frame_str, FRAME_MAX_LEN*7);
-            printf("\nINFO: Emitted signal '%s' (%lu bytes)\n", sig.name, sig.frame_len);
-            printf("%s\n", frame_str);
-        }
 
         // Reset to flash mode button
         bool btn = gpio_get(BTN_PIN);
