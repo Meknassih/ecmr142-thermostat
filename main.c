@@ -14,6 +14,7 @@
 #include "ecmr142.h"
 #include "ac_state.h"
 #include "ac_strategy_economic.h"
+#include "humidex.h"
 
 #define LED_PIN 5
 #define BTN_PIN 15
@@ -70,6 +71,7 @@ int main() {
     float aht_t = 0.0f, aht_h = 0.0f;
     float bmp_t = 0.0f, bmp_p = 0.0f;
     float avg_t = 0.0f;
+    float humidex = 0.0f;
 
     toggle_running_led(CYW43_WL_GPIO_LED_PIN);
 
@@ -93,6 +95,7 @@ int main() {
                 printf("BMP280: %.1fC  %.0fPa\n", bmp_t, bmp_p);
             }
             avg_t = (aht_t + bmp_t) / 2;
+            humidex = humidex_compute(avg_t, aht_h);
 
             ac_state_evaluate(avg_t, aht_h);
             if (ac_state_changed()) {
@@ -117,12 +120,12 @@ int main() {
         }
 
         // Write sensor values to OLED
-        char t_h_line[17], p_line[17];
+        char t_h_line[17], hdx_line[17];
         snprintf(t_h_line, sizeof(t_h_line), "%.1fC %.1f%%",
                  avg_t, aht_h);
         ssd1306_write_string(0, 16, t_h_line);
-        snprintf(p_line, sizeof(p_line), "%.0fPa", bmp_p);
-        ssd1306_write_string(0, 24, p_line);
+        snprintf(hdx_line, sizeof(hdx_line), "H %.1f", humidex);
+        ssd1306_write_string(0, 24, hdx_line);
 
         // IR raw capture
         /* uint32_t durations[400];
