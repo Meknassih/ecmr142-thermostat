@@ -4,8 +4,9 @@
 #include <stdio.h>
 
 #define DEBOUNCE_DUR_US       (60ull * 1000 * 1000)
-#define MAX_COOL_DUR_US       (30ull * 60 * 1000 * 1000)
-#define FAN_DUR_US            (2ull * 60 * 1000 * 1000)
+#define COOL_CYCLE_DUR_US     (60ull * 60 * 1000 * 1000)
+#define FAN_DUR_US            (5ull * 60 * 1000 * 1000)
+#define COMPRESSOR_BACKOFF_US (15ull * 60 * 1000 * 1000)
 
 #define TARGET_HUMIDEX       30.0f
 #define DEADBAND_HIGH         3.0f
@@ -15,8 +16,14 @@
 static ac_state internal_state;
 static absolute_time_t state_entered;
 static absolute_time_t cooling_started;
+static absolute_time_t cooling_ended_at;
 static bool cooling_phase;
+static bool backoff_armed;
 static bool initialized;
+
+static bool is_cooling(ac_state s) {
+    return s == AC_COOL_LOW || s == AC_COOL_MED || s == AC_COOL_HIGH;
+}
 
 static const char *state_name(ac_state s) {
     switch (s) {
@@ -34,9 +41,15 @@ static void economic_init(void) {
     internal_state = AC_OFF;
     state_entered = get_absolute_time();
     cooling_phase = false;
+    backoff_armed = false;
+    cooling_ended_at = nil_time;
 }
 
 static void apply_transition(ac_state to, absolute_time_t now) {
+    if (is_cooling(internal_state) && !is_cooling(to)) {
+        cooling_ended_at = now;
+        backoff_armed = true;
+    }
     internal_state = to;
     state_entered = now;
     if (to == AC_COOL_HIGH) {
@@ -70,9 +83,9 @@ static ac_state economic_evaluate(float temp, float hum) {
         break;
 
     case AC_COOL_HIGH:
-        if (cooling_elapsed >= MAX_COOL_DUR_US) {
+        if (cooling_elapsed >= COOL_CYCLE_DUR_US) {
             desired = AC_FAN;
-            reason = "max cooling time expired";
+            reason = "cool cycle duration expired";
         } else if (delta <= GENTLE_BAND) {
             desired = AC_COOL_LOW;
             reason = "delta within gentle band";
@@ -86,9 +99,9 @@ static ac_state economic_evaluate(float temp, float hum) {
         } else if (delta <= 0) {
             desired = AC_FAN;
             reason = "target humidex reached";
-        } else if (cooling_elapsed >= MAX_COOL_DUR_US) {
+        } else if (cooling_elapsed >= COOL_CYCLE_DUR_US) {
             desired = AC_FAN;
-            reason = "max cooling time expired";
+            reason = "cool cycle duration expired";
         }
         break;
 
@@ -101,6 +114,16 @@ static ac_state economic_evaluate(float temp, float hum) {
 
     default:
         break;
+    }
+
+    if (is_cooling(desired) && !is_cooling(internal_state) && backoff_armed) {
+        int64_t since_off = absolute_time_diff_us(cooling_ended_at, now);
+        if (since_off < COMPRESSOR_BACKOFF_US) {
+            int64_t left_s = (COMPRESSOR_BACKOFF_US - since_off) / 1000000;
+            printf("ΔHdx=%+.1f — would enter %s, blocked by compressor backoff %llds\n",
+                   delta, state_name(desired), left_s);
+            desired = internal_state;
+        }
     }
 
     ac_state actual;
