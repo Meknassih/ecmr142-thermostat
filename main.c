@@ -16,11 +16,11 @@
 #include "ac_strategy_economic.h"
 #include "humidex.h"
 
-#define LED_PIN 5
+#define LED_PIN 1
 #define BTN_PIN 15
 #define OLED_SDA_PIN 8
 #define OLED_SCL_PIN 9
-#define IR_RCV_PIN 7
+#define IR_RCV_PIN 0
 #define IR_EMIT_PIN 16
 
 void toggle_running_led(unsigned int gpio) {

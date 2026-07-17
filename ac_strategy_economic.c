@@ -5,13 +5,13 @@
 
 #define DEBOUNCE_DUR_US       (60ull * 1000 * 1000)
 #define COOL_CYCLE_DUR_US     (60ull * 60 * 1000 * 1000)
-#define FAN_DUR_US            (5ull * 60 * 1000 * 1000)
+#define FAN_DUR_US            (3ull * 60 * 1000 * 1000)
 #define COMPRESSOR_BACKOFF_US (15ull * 60 * 1000 * 1000)
 
-#define TARGET_HUMIDEX       30.0f
+#define TARGET_HUMIDEX       29.0f
 #define DEADBAND_HIGH         3.0f
 #define GENTLE_BAND           1.0f
-#define GENTLE_HYST           0.5f
+#define GENTLE_HYST           0.25f
 
 static ac_state internal_state;
 static absolute_time_t state_entered;
