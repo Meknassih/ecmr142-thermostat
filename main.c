@@ -66,6 +66,14 @@ int main() {
     i2c_init(i2c0, 400 * 1000);
     VOK("i2c init");
 
+    VLOG("I2C bus scan:");
+    for (uint8_t a = 0x01; a < 0x7F; a++) {
+        uint8_t zero = 0;
+        int r = i2c_write_blocking(i2c0, a, &zero, 1, false);
+        if (r >= 0) printf("I2C: 0x%02X ACK\n", a);
+    }
+    VOK("i2c scan");
+
     VLOG("cyw43_arch_init");
     int err = cyw43_arch_init();
     if (err) {
@@ -76,12 +84,20 @@ int main() {
     VOK("cyw43_arch_init");
 
     VLOG("ssd1306_init");
-    ssd1306_init(i2c_default);
-    VOK("ssd1306_init");
-    ssd1306_clear();
-    ssd1306_write_string(16, 12, "Started");
-    ssd1306_show();
-    VOK("ssd1306 clear, write, show");
+    if (!ssd1306_init(i2c_default)) {
+        VFAIL("ssd1306_init");
+        printf("ERR: OLED init failed (no ACK at 0x%02X)\n", 0x3C);
+    } else {
+        VOK("ssd1306_init");
+        ssd1306_clear();
+        ssd1306_write_string(16, 12, "Started");
+        if (ssd1306_show() < 0) {
+            VFAIL("ssd1306_show");
+            printf("ERR: OLED show NACKed\n");
+        } else {
+            VOK("ssd1306 clear, write, show");
+        }
+    }
 
     VLOG("aht20_init");
     if (!aht20_init(i2c_default)) {

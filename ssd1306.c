@@ -34,22 +34,24 @@
 static i2c_inst_t *i2c_port;
 static uint8_t framebuf[SSD1306_BUF_LEN];
 
-static void send_cmd(uint8_t cmd) {
+static int send_cmd(uint8_t cmd) {
     uint8_t buf[2] = {0x80, cmd};
-    i2c_write_blocking(i2c_port, SSD1306_I2C_ADDR, buf, 2, false);
+    return i2c_write_blocking(i2c_port, SSD1306_I2C_ADDR, buf, 2, false);
 }
 
-static void send_cmd_list(uint8_t *cmds, int num) {
+static bool send_cmd_list(uint8_t *cmds, int num) {
     for (int i = 0; i < num; i++)
-        send_cmd(cmds[i]);
+        if (send_cmd(cmds[i]) < 0) return false;
+    return true;
 }
 
-static void send_buf(uint8_t *buf, int len) {
+static int send_buf(uint8_t *buf, int len) {
     uint8_t *temp = malloc(len + 1);
     temp[0] = 0x40;
     memcpy(temp + 1, buf, len);
-    i2c_write_blocking(i2c_port, SSD1306_I2C_ADDR, temp, len + 1, false);
+    int r = i2c_write_blocking(i2c_port, SSD1306_I2C_ADDR, temp, len + 1, false);
     free(temp);
+    return r;
 }
 
 static int get_font_index(uint8_t ch) {
@@ -60,7 +62,7 @@ static int get_font_index(uint8_t ch) {
     return 0;
 }
 
-void ssd1306_init(i2c_inst_t *i2c) {
+bool ssd1306_init(i2c_inst_t *i2c) {
     i2c_port = i2c;
 
     uint8_t cmds[] = {
@@ -83,9 +85,10 @@ void ssd1306_init(i2c_inst_t *i2c) {
         SSD1306_SET_DISP | 0x01,
     };
 
-    send_cmd_list(cmds, sizeof(cmds));
+    if (!send_cmd_list(cmds, sizeof(cmds))) return false;
     ssd1306_clear();
-    ssd1306_show();
+    if (ssd1306_show() < 0) return false;
+    return true;
 }
 
 void ssd1306_clear(void) {
@@ -106,13 +109,13 @@ void ssd1306_set_pixel(int x, int y, bool on) {
         framebuf[byte_idx] &= ~(1 << (y % 8));
 }
 
-void ssd1306_show(void) {
+int ssd1306_show(void) {
     uint8_t cmds[] = {
         SSD1306_SET_COL_ADDR, 0, SSD1306_WIDTH - 1,
         SSD1306_SET_PAGE_ADDR, 0, SSD1306_NUM_PAGES - 1
     };
-    send_cmd_list(cmds, sizeof(cmds));
-    send_buf(framebuf, SSD1306_BUF_LEN);
+    if (!send_cmd_list(cmds, sizeof(cmds))) return -1;
+    return send_buf(framebuf, SSD1306_BUF_LEN);
 }
 
 void ssd1306_write_string(int x, int y, const char *str) {
