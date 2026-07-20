@@ -16,10 +16,24 @@
 #include "ac_strategy_economic.h"
 #include "humidex.h"
 
+#ifndef VERBOSE
+#define VERBOSE 0
+#endif
+
+#if VERBOSE
+#define VLOG(fmt, ...) printf("[V] " fmt "\n", ##__VA_ARGS__)
+#define VOK(label)     printf("[V] OK   %s\n", label)
+#define VFAIL(label)   printf("[V] FAIL %s\n", label)
+#else
+#define VLOG(fmt, ...) ((void)0)
+#define VOK(label)     ((void)0)
+#define VFAIL(label)   ((void)0)
+#endif
+
 #define LED_PIN 1
 #define BTN_PIN 15
-#define OLED_SDA_PIN 8
-#define OLED_SCL_PIN 9
+#define OLED_SDA_PIN 4
+#define OLED_SCL_PIN 5
 #define IR_RCV_PIN 0
 #define IR_EMIT_PIN 16
 
@@ -34,39 +48,74 @@ void toggle_running_led(unsigned int gpio) {
 int main() {
     stdio_init_all();
     sleep_ms(1500); // Allow USB serial to connect
+    VLOG("stdio initialized, boot log follows");
+
+    VLOG("init BTN_PIN=%d LED_PIN=%d", BTN_PIN, LED_PIN);
     gpio_init(BTN_PIN);
     gpio_init(LED_PIN);
     gpio_set_dir(LED_PIN, 1);
     gpio_set_dir(BTN_PIN, 0);
     gpio_pull_down(BTN_PIN);
+    VOK("gpio BTN/LED");
+
+    VLOG("init I2C OLED SDA=%d SCL=%d @400kHz", OLED_SDA_PIN, OLED_SCL_PIN);
     gpio_set_function(OLED_SDA_PIN, GPIO_FUNC_I2C);
     gpio_set_function(OLED_SCL_PIN, GPIO_FUNC_I2C);
     gpio_pull_up(OLED_SDA_PIN);
     gpio_pull_up(OLED_SCL_PIN);
-    i2c_init(i2c_default, 400 * 1000);
+    i2c_init(i2c0, 400 * 1000);
+    VOK("i2c init");
 
+    VLOG("cyw43_arch_init");
     int err = cyw43_arch_init();
     if (err) {
+        VFAIL("cyw43_arch_init");
+        printf("ERR: cyw43_arch_init returned %d\n", err);
         reset_usb_boot(0, 0);
     }
+    VOK("cyw43_arch_init");
 
+    VLOG("ssd1306_init");
     ssd1306_init(i2c_default);
+    VOK("ssd1306_init");
     ssd1306_clear();
     ssd1306_write_string(16, 12, "Started");
     ssd1306_show();
+    VOK("ssd1306 clear, write, show");
 
+    VLOG("aht20_init");
     if (!aht20_init(i2c_default)) {
+        VFAIL("aht20_init");
         printf("WARN: AHT20 init failed\n");
-    }
-    if (!bmp280_init(i2c_default)) {
-        printf("WARN: BMP280 init failed\n");
+    } else {
+        VOK("aht20_init");
     }
 
+    VLOG("bmp280_init");
+    if (!bmp280_init(i2c_default)) {
+        VFAIL("bmp280_init");
+        printf("WARN: BMP280 init failed\n");
+    } else {
+        VOK("bmp280_init");
+    }
+
+    VLOG("ir_receiver_init pin=%d", IR_RCV_PIN);
     ir_receiver_init(IR_RCV_PIN);
+    VOK("ir_receiver_init");
+
+    VLOG("ir_emitter_init pin=%d", IR_EMIT_PIN);
     ir_emitter_init(IR_EMIT_PIN, 38);
+    VOK("ir_emitter_init");
+
+    VLOG("ac_state_init + strategy_economic");
+    ac_state_init();
+    ac_state_set_strategy(&strategy_economic);
+    VOK("ac_state ready");
 
     unsigned int tick=10;
     unsigned long int tick_count=0;
+    VLOG("entering main loop");
+
 
     float aht_t = 0.0f, aht_h = 0.0f;
     float bmp_t = 0.0f, bmp_p = 0.0f;

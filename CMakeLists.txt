@@ -13,6 +13,11 @@ pico_add_extra_outputs(main)
 pico_enable_stdio_usb(main 1)
 pico_enable_stdio_uart(main 0)
 
+option(VERBOSE "Enable verbose boot logging in main.c" OFF)
+if(VERBOSE)
+    target_compile_definitions(main PRIVATE VERBOSE=1)
+endif()
+
 # Add custom flash target
 add_custom_target(flash
     COMMAND ${CMAKE_COMMAND} -E echo "Flashing main.uf2..."
