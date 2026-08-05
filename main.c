@@ -55,7 +55,7 @@ int main() {
     gpio_init(LED_PIN);
     gpio_set_dir(LED_PIN, 1);
     gpio_set_dir(BTN_PIN, 0);
-    gpio_pull_down(BTN_PIN);
+    gpio_pull_up(BTN_PIN);
     VOK("gpio BTN/LED");
 
     VLOG("init I2C OLED SDA=%d SCL=%d @400kHz", OLED_SDA_PIN, OLED_SCL_PIN);
@@ -143,9 +143,7 @@ int main() {
     ac_state_init();
     ac_state_set_strategy(&strategy_economic);
 
-    char *addr_str = calloc(64, sizeof(char)), *cmd_str = calloc(64, sizeof(char));
-    uint8_t addr = 0;
-    uint8_t cmd = 0;
+    unsigned int btn_held_tcks = 0; // Counts ticks the btn is held
     while (true) {
         char s_line[17];
         ac_state_str(ac_state_get(), s_line, sizeof(s_line));
@@ -214,13 +212,19 @@ int main() {
         } */
 
         // Reset to flash mode button
+        // No logic to reset btn_held_tcks because outcome either
+        // leads to reboot or Pstate
         bool btn = gpio_get(BTN_PIN);
-        gpio_put(LED_PIN, btn);
-        if (btn) {
+        if (!btn && btn_held_tcks >= 200) {
+            gpio_put(LED_PIN, 1);
             sleep_ms(1000);
             ssd1306_clear();
             ssd1306_show();
             reset_usb_boot(0, 0);
+        } else if (!btn && btn_held_tcks < 200) {
+            btn_held_tcks++;
+        } else if (btn && btn_held_tcks > 0 && btn_held_tcks < 200) {
+            // TODO: go to Pstate, program starts from scratch on GPIO wakeup
         }
 
         ssd1306_show();
