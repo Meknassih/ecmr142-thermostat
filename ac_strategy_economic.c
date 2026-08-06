@@ -8,10 +8,14 @@
 #define FAN_DUR_US            (3ull * 60 * 1000 * 1000)
 #define COMPRESSOR_BACKOFF_US (15ull * 60 * 1000 * 1000)
 
-#define TARGET_HUMIDEX       29.0f
+#define TARGET_HUMIDEX_DEFAULT 29.0f
+#define TARGET_HUMIDEX_MIN     20.0f
+#define TARGET_HUMIDEX_MAX     40.0f
 #define DEADBAND_HIGH         3.0f
 #define GENTLE_BAND           1.0f
 #define GENTLE_HYST           0.25f
+
+static float target_humidex = TARGET_HUMIDEX_DEFAULT;
 
 static ac_state internal_state;
 static absolute_time_t state_entered;
@@ -65,7 +69,7 @@ static ac_state economic_evaluate(float temp, float hum) {
 
     absolute_time_t now = get_absolute_time();
     float feels_like = humidex_compute(temp, hum);
-    float delta = feels_like - TARGET_HUMIDEX;
+    float delta = feels_like - target_humidex;
     int64_t time_in_state = absolute_time_diff_us(state_entered, now);
     int64_t cooling_elapsed = cooling_phase
         ? absolute_time_diff_us(cooling_started, now)
@@ -151,7 +155,23 @@ static ac_state economic_evaluate(float temp, float hum) {
     return actual;
 }
 
+static void economic_adjust_target(float delta) {
+    target_humidex += delta;
+    if (target_humidex < TARGET_HUMIDEX_MIN) target_humidex = TARGET_HUMIDEX_MIN;
+    if (target_humidex > TARGET_HUMIDEX_MAX) target_humidex = TARGET_HUMIDEX_MAX;
+    if (initialized) {
+        state_entered = delayed_by_us(get_absolute_time(), -DEBOUNCE_DUR_US);
+    }
+}
+
+static float economic_get_target(void) {
+    return target_humidex;
+}
+
 const ac_strategy strategy_economic = {
     .name = "economic",
     .evaluate = economic_evaluate,
+    .adjust_target = economic_adjust_target,
+    .get_target = economic_get_target,
+    .target_unit = "Hdx",
 };

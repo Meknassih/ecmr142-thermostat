@@ -32,6 +32,9 @@
 
 #define LED_PIN 1
 #define BTN_PIN 15
+#define BTN_UP_PIN 6
+#define BTN_DOWN_PIN 7
+#define BTN_DEBOUNCE_TICKS 3
 #define OLED_SDA_PIN 4
 #define OLED_SCL_PIN 5
 #define IR_RCV_PIN 0
@@ -57,6 +60,15 @@ int main() {
     gpio_set_dir(BTN_PIN, 0);
     gpio_pull_up(BTN_PIN);
     VOK("gpio BTN/LED");
+
+    VLOG("init BTN_UP_PIN=%d BTN_DOWN_PIN=%d", BTN_UP_PIN, BTN_DOWN_PIN);
+    gpio_init(BTN_UP_PIN);
+    gpio_init(BTN_DOWN_PIN);
+    gpio_set_dir(BTN_UP_PIN, 0);
+    gpio_set_dir(BTN_DOWN_PIN, 0);
+    gpio_pull_up(BTN_UP_PIN);
+    gpio_pull_up(BTN_DOWN_PIN);
+    VOK("gpio target up/down buttons");
 
     VLOG("init I2C OLED SDA=%d SCL=%d @400kHz", OLED_SDA_PIN, OLED_SCL_PIN);
     gpio_set_function(OLED_SDA_PIN, GPIO_FUNC_I2C);
@@ -140,15 +152,18 @@ int main() {
 
     toggle_running_led(CYW43_WL_GPIO_LED_PIN);
 
-    ac_state_init();
-    ac_state_set_strategy(&strategy_economic);
-
     unsigned int btn_held_tcks = 0; // Counts ticks the btn is held
+    unsigned int btn_up_tcks = 0, btn_down_tcks = 0;
     while (true) {
         char s_line[17];
         ac_state_str(ac_state_get(), s_line, sizeof(s_line));
         ssd1306_clear();
         ssd1306_write_string(8, 0, s_line);
+
+        char tgt_line[17];
+        snprintf(tgt_line, sizeof(tgt_line), "Tgt %s %.0f",
+                 ac_state_target_unit(), ac_state_get_target());
+        ssd1306_write_string(0, 8, tgt_line);
 
         if (tick_count % 100 == 0) {
             if (aht20_read(&aht_t, &aht_h)) {
@@ -211,9 +226,21 @@ int main() {
             }
         } */
 
+        // Target adjust buttons: fire once after debounce, no auto-repeat
+        if (!gpio_get(BTN_UP_PIN)) {
+            if (btn_up_tcks <= BTN_DEBOUNCE_TICKS) btn_up_tcks++;
+            if (btn_up_tcks == BTN_DEBOUNCE_TICKS) ac_state_adjust_target(1.0f);
+        } else {
+            btn_up_tcks = 0;
+        }
+        if (!gpio_get(BTN_DOWN_PIN)) {
+            if (btn_down_tcks <= BTN_DEBOUNCE_TICKS) btn_down_tcks++;
+            if (btn_down_tcks == BTN_DEBOUNCE_TICKS) ac_state_adjust_target(-1.0f);
+        } else {
+            btn_down_tcks = 0;
+        }
+
         // Reset to flash mode button
-        // No logic to reset btn_held_tcks because outcome either
-        // leads to reboot or Pstate
         bool btn = gpio_get(BTN_PIN);
         if (!btn && btn_held_tcks >= 200) {
             gpio_put(LED_PIN, 1);
@@ -223,8 +250,6 @@ int main() {
             reset_usb_boot(0, 0);
         } else if (!btn && btn_held_tcks < 200) {
             btn_held_tcks++;
-        } else if (btn && btn_held_tcks > 0 && btn_held_tcks < 200) {
-            // TODO: go to Pstate, program starts from scratch on GPIO wakeup
         }
 
         ssd1306_show();

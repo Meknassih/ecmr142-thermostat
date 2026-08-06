@@ -63,3 +63,19 @@ void ac_state_str(ac_state s, char *buf, size_t len) {
     }
     buf[len - 1] = '\0';
 }
+
+bool ac_state_adjust_target(float delta) {
+    if (!active_strategy || !active_strategy->adjust_target) return false;
+    active_strategy->adjust_target(delta);
+    return true;
+}
+
+float ac_state_get_target(void) {
+    if (!active_strategy || !active_strategy->get_target) return 0.0f;
+    return active_strategy->get_target();
+}
+
+const char *ac_state_target_unit(void) {
+    if (!active_strategy || !active_strategy->target_unit) return "";
+    return active_strategy->target_unit;
+}
