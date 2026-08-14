@@ -1,6 +1,8 @@
 #include "pico/stdlib.h"
 #include "pico/bootrom.h"
+#include "boot/picoboot_constants.h"
 #include "pico/cyw43_arch.h"
+#include <pico/time.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
@@ -278,6 +280,12 @@ int main() {
             reset_usb_boot(0, 0);
         } else if (!btn && btn_held_tcks < 200) {
             btn_held_tcks++;
+        } else if (btn && btn_held_tcks > 0) {
+            gpio_put(LED_PIN, 1);
+            sleep_ms(500);
+            rom_reboot(REBOOT2_FLAG_REBOOT_TYPE_NORMAL |
+                           REBOOT2_FLAG_NO_RETURN_ON_SUCCESS,
+                       100, 0, 0);
         }
 
         ssd1306_show();
