@@ -14,6 +14,7 @@
 #include "ecmr142.h"
 #include "ac_state.h"
 #include "ac_strategy_economic.h"
+#include "ac_strategy_time_interval.h"
 #include "humidex.h"
 
 #ifndef VERBOSE
@@ -135,9 +136,11 @@ int main() {
     ir_emitter_init(IR_EMIT_PIN, 38);
     VOK("ir_emitter_init");
 
+    ac_strategy strategies[2] = {strategy_economic, strategy_time_interval};
+    unsigned short active_strategy_i = 0;
     VLOG("ac_state_init + strategy_economic");
     ac_state_init();
-    ac_state_set_strategy(&strategy_economic);
+    ac_state_set_strategy(&(strategies[active_strategy_i]));
     VOK("ac_state ready");
 
     unsigned int tick=10;
@@ -174,6 +177,7 @@ int main() {
             }
             avg_t = (aht_t + bmp_t) / 2;
             humidex = humidex_compute(avg_t, aht_h);
+            printf("%s\n", tgt_line);
 
             ac_state_evaluate(avg_t, aht_h);
             if (ac_state_changed()) {
@@ -228,15 +232,39 @@ int main() {
 
         // Target adjust buttons: fire once after debounce, no auto-repeat
         if (!gpio_get(BTN_UP_PIN)) {
-            if (btn_up_tcks <= BTN_DEBOUNCE_TICKS) btn_up_tcks++;
-            if (btn_up_tcks == BTN_DEBOUNCE_TICKS) ac_state_adjust_target(1.0f);
+            btn_up_tcks++;
         } else {
+            if (btn_up_tcks > 0 && btn_up_tcks <= 100) ac_state_adjust_target(1.0f);
+            else if (btn_up_tcks > 100) {
+                // Maybe I can get away without init and continue on last strategy's state
+                // ac_state_init();
+                unsigned short next_strategy_i = active_strategy_i + 1;
+                if (next_strategy_i >= sizeof(strategies) / sizeof(strategies[0])) {
+                    next_strategy_i = 0;
+                }
+                ac_strategy *next_strat = &(strategies[next_strategy_i]);
+                printf("switching to strategy %s (%d)\n", next_strat->name, next_strategy_i);
+                ac_state_set_strategy(next_strat);
+                active_strategy_i = next_strategy_i;
+            }
             btn_up_tcks = 0;
         }
         if (!gpio_get(BTN_DOWN_PIN)) {
-            if (btn_down_tcks <= BTN_DEBOUNCE_TICKS) btn_down_tcks++;
-            if (btn_down_tcks == BTN_DEBOUNCE_TICKS) ac_state_adjust_target(-1.0f);
+            btn_down_tcks++;
         } else {
+            if (btn_down_tcks > 0 && btn_down_tcks <= 100) ac_state_adjust_target(-1.0f);
+            else if (btn_down_tcks > 100) {
+                // Maybe I can get away without init and continue on last strategy's state
+                // ac_state_init();
+                short next_strategy_i = active_strategy_i - 1;
+                if (next_strategy_i < 0) {
+                    next_strategy_i = (sizeof(strategies) / sizeof(strategies[0])) - 1;
+                }
+                ac_strategy *next_strat = &(strategies[next_strategy_i]);
+                printf("switching to strategy %s (%d)\n", next_strat->name, next_strategy_i);
+                ac_state_set_strategy(&(strategies[next_strategy_i]));
+                active_strategy_i = next_strategy_i;
+            }
             btn_down_tcks = 0;
         }
 
